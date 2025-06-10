@@ -17,19 +17,21 @@ class PreferencesManager {
     Preferences preferences;
 
 public:
-    PrefsData settings;
-
-    PreferencesManager() {
-    }
+    PrefsData settings = {};
 
     void read() {
-        if (preferences.begin(PREFERENCES_NAMESPACE, true)
-            && preferences.getBytesLength(PREFERENCES_KEY_SETTINGS) == sizeof(PrefsData)
-        ) {
-            preferences.getBytes(PREFERENCES_KEY_SETTINGS, &settings, sizeof(PrefsData));
+        if (preferences.begin(PREFERENCES_NAMESPACE, true)) {
+            if (preferences.getBytesLength(PREFERENCES_KEY_SETTINGS) == sizeof(PrefsData)) {
+                preferences.getBytes(PREFERENCES_KEY_SETTINGS, &settings, sizeof(PrefsData));
+            } else {
+                settings = PrefsData();
+            }
+            preferences.end();
+        } else {
+            settings = PrefsData();
         }
-        preferences.end();
     }
+
 
     void save() {
         if (!preferences.begin(PREFERENCES_NAMESPACE, false)) return;

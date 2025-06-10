@@ -2,8 +2,9 @@
 
 #include <Update.h>
 
+#include "LoggerHelper.h"
 #include "../../src/PreferencesManager.h"
-#include "Display/BackDisplay.h"
+#include "Display/LcdDisplay.h"
 
 void RemoteDevelopmentService::setupOTA() {
     if (!isAnyNetworkingActive()) {
@@ -40,10 +41,10 @@ void RemoteDevelopmentService::setupOTA() {
 
             printLn("SAVED");
 
-            backDisplay->clear();
-            backDisplay->setCursorToLine();
-            backDisplay->print("Credentials saved! Rebooting...");
-            backDisplay->display();
+            lcdDisplay->clear();
+            lcdDisplay->setCursorToLine();
+            lcdDisplay->print("Credentials saved! Rebooting...");
+            printLn("Credentials saved! Rebooting...");
 
             OTAServer->send(200, "text/html", "Credentials saved! Rebooting...");
             delay(1000);
@@ -100,19 +101,7 @@ void RemoteDevelopmentService::setupTelnet() {
     isTelnetActive = true;
 }
 
-void RemoteDevelopmentService::setupNTP() {
-    if (!isWifiActive) {
-        return;
-    }
-
-    configTime(3600, 3600, "pool.ntp.org");
-    tm timeInfo;
-    getLocalTime(&timeInfo);
-
-    isNTPActive = true;
-}
-
-void RemoteDevelopmentService::printLn(const char *format, ...) {
+void RemoteDevelopmentService::remotePrintLn(const char *format, ...) {
     char buf[256];
     va_list args;
     va_start(args, format);
@@ -136,27 +125,31 @@ void RemoteDevelopmentService::telnetFlushLogBuffer() {
     }
 }
 
-void RemoteDevelopmentService::init(PreferencesManager &_preferencesManager, BackDisplay &_backDisplay) {
+void RemoteDevelopmentService::init(PreferencesManager &_preferencesManager, LcdDisplay &_lcdDisplay) {
     preferencesManager = &_preferencesManager;
-    backDisplay = &_backDisplay;
+    lcdDisplay = &_lcdDisplay;
 
     const String savedSSID = preferencesManager->settings.wifiSSID;
     const String savedPassword = preferencesManager->settings.wifiPassword;
 
     if (!preferencesManager->settings.enableWifi) {
+        printLn("Ignore wifi");
         return;
     }
 
-    WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
+    printLn("Connecting to %s", savedSSID);
+    WiFi.begin(savedSSID.c_str(), savedPassword);
 
     const unsigned long startAttemptTime = millis();
     constexpr unsigned long timeout = 10000;
 
-    backDisplay->clear();
-    backDisplay->setCursorToLine();
-    backDisplay->print("Connecting to " + savedSSID);
-    backDisplay->print("Using " + savedPassword);
-    backDisplay->display();
+    lcdDisplay->clear();
+    lcdDisplay->setCursorToLine();
+    lcdDisplay->print("SSID " + savedSSID);
+    printLn("SSID %s", savedSSID);
+    lcdDisplay->setCursorToLine(0, 1);
+    lcdDisplay->print("PASS " + savedPassword);
+    printLn("PASS %s", savedPassword);
 
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeout) {
         delay(500);
@@ -165,11 +158,13 @@ void RemoteDevelopmentService::init(PreferencesManager &_preferencesManager, Bac
     if (WiFiClass::status() != WL_CONNECTED) {
         enableAP();
     } else {
-        backDisplay->clear();
-        backDisplay->setCursorToLine();
-        backDisplay->print(WiFi.SSID());
-        backDisplay->print(WiFi.localIP().toString());
-        backDisplay->display();
+        lcdDisplay->clear();
+        lcdDisplay->setCursorToLine();
+        lcdDisplay->print(WiFi.SSID());
+        printLn("AP SSID: %s", WiFi.SSID());
+        lcdDisplay->setCursorToLine(0, 1);
+        lcdDisplay->print(WiFi.localIP().toString());
+        printLn("AP IP: %s", WiFi.localIP().toString());
 
         isWifiActive = true;
     }
@@ -183,14 +178,14 @@ void RemoteDevelopmentService::enableAP() {
         return;
     }
 
-    WiFi.softAP("SquashCounter", "12345678");
+    WiFi.softAP("ScaraPlotter", "12345678");
 
-    backDisplay->clear();
-    backDisplay->setCursorToLine();
-    backDisplay->println(F("SquashCount"));
-    backDisplay->println(F("12345678"));
-    backDisplay->println(WiFi.softAPIP().toString());
-    backDisplay->display();
+    lcdDisplay->clear();
+    lcdDisplay->setCursorToLine();
+    lcdDisplay->print(F("12345678"));
+    lcdDisplay->setCursorToLine(0, 1);
+    lcdDisplay->print(WiFi.softAPIP().toString());
+    printLn("AP IP: %s", WiFi.softAPIP().toString());
 
     delay(5000);
 

@@ -3,15 +3,17 @@
 
 #include <deque>
 #include <WebServer.h>
+
+#include "LiquidCrystal.h"
 #include "../PreferencesManager.h"
-#include "Display/BackDisplay.h"
+#include "Display/LcdDisplay.h"
 
 class RemoteDevelopmentService {
     WebServer *OTAServer = nullptr;
     WiFiServer *telnetServer = nullptr;
     WiFiClient telnetClient;
     PreferencesManager *preferencesManager = nullptr;
-    BackDisplay *backDisplay = nullptr;
+    LcdDisplay *lcdDisplay = nullptr;
 
     bool isAPActive = false;
     bool isWifiActive = false;
@@ -26,8 +28,6 @@ class RemoteDevelopmentService {
 
     void setupTelnet();
 
-    void setupNTP();
-
     void handleTelnet();
 
 public:
@@ -35,11 +35,11 @@ public:
 
     void disableAP();
 
-    void init(PreferencesManager &_preferencesManager, BackDisplay &_backDisplay);
+    void init(PreferencesManager &_preferencesManager, LcdDisplay &_lcdDisplay);
 
     void loop();
 
-    void printLn(const char *format, ...);
+    void remotePrintLn(const char *format, ...);
 
     void telnetFlushLogBuffer();
 
