@@ -13,9 +13,9 @@ inline void printLn(const char *format, ...) {
     va_end(args);
 
     Serial.println(buf);
-    if (!!gRemoteDevelopmentService) {
-        gRemoteDevelopmentService->remotePrintLn("%s", buf);
-    };
+    // if (!!gRemoteDevelopmentService) {
+    //     gRemoteDevelopmentService->remotePrintLn("%s", buf);
+    // };
 }
 
 #endif //LOGGER_HELPER
