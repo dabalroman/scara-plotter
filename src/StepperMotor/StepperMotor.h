@@ -50,6 +50,18 @@ public:
         maxPosition = _maxPosition;
     }
 
+    void setZeroPosition() const {
+        stepper.setCurrentPosition(0);
+    }
+
+    long getMinPosition() const {
+        return minPosition;
+    }
+
+    long getMaxPosition() const {
+        return maxPosition;
+    }
+
     void moveToPosition(const long position) const {
         const long clampedPosition = clamp(minPosition, position, maxPosition);
 

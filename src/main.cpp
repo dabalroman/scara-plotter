@@ -10,25 +10,25 @@
 
 // Rotary encoder
 constexpr int GPIO_ENCODER_CLK = 4;
-constexpr int GPIO_ENCODER_DT  = 16;
-constexpr int GPIO_ENCODER_SW  = 17;
+constexpr int GPIO_ENCODER_DT = 16;
+constexpr int GPIO_ENCODER_SW = 17;
 
 // Stepper motors
-constexpr int GPIO_MOTOR_B_DIR  = 18;
-constexpr int GPIO_MOTOR_B_STEP = 19;
-constexpr int GPIO_MOTOR_A_DIR  = 21;
-constexpr int GPIO_MOTOR_A_STEP = 22;
+constexpr int GPIO_MOTOR_A_DIR = 18;
+constexpr int GPIO_MOTOR_A_STEP = 19;
+constexpr int GPIO_MOTOR_B_DIR = 21;
+constexpr int GPIO_MOTOR_B_STEP = 22;
 
 // Servo
 constexpr int GPIO_SERVO = 23;
 
 // Limit switches
-constexpr int GPIO_LIMIT_SWITCH_B = 12; // 34 on the PCB
-constexpr int GPIO_LIMIT_SWITCH_A = 13; // 35 on the PCB
+constexpr int GPIO_LIMIT_SWITCH_A = 34;
+constexpr int GPIO_LIMIT_SWITCH_B = 35;
 
 // LCD (HD44780, 4-bit mode)
 constexpr int GPIO_LCD_RS = 32;
-constexpr int GPIO_LCD_E  = 33;
+constexpr int GPIO_LCD_E = 33;
 constexpr int GPIO_LCD_D4 = 25;
 constexpr int GPIO_LCD_D5 = 26;
 constexpr int GPIO_LCD_D6 = 27;
@@ -59,9 +59,11 @@ StepperMotorCoordinator stepperCoordinator(stepperA, stepperB, inputManager);
 
 unsigned long lastUpdate = 0;
 
+bool editingA = true;
+int lastEncoderClk = HIGH;
 
 // Wi-Fi and OTA
-RemoteDevelopmentService *gRemoteDevelopmentService = nullptr;\
+RemoteDevelopmentService *gRemoteDevelopmentService = nullptr;
 
 // Settings
 PreferencesManager preferencesManager;
@@ -71,7 +73,7 @@ void initHardware() {
 
     pinMode(GPIO_ENCODER_CLK, INPUT);
     pinMode(GPIO_ENCODER_DT, INPUT);
-    pinMode(GPIO_ENCODER_SW, INPUT_PULLUP);
+    pinMode(GPIO_ENCODER_SW, INPUT);
 
     pinMode(GPIO_MOTOR_A_DIR, OUTPUT);
     pinMode(GPIO_MOTOR_A_STEP, OUTPUT);
@@ -80,8 +82,8 @@ void initHardware() {
 
     pinMode(GPIO_SERVO, OUTPUT);
 
-    pinMode(GPIO_LIMIT_SWITCH_A, INPUT_PULLUP);
-    pinMode(GPIO_LIMIT_SWITCH_B, INPUT_PULLUP);
+    pinMode(GPIO_LIMIT_SWITCH_A, INPUT);
+    pinMode(GPIO_LIMIT_SWITCH_B, INPUT);
 
     attachInterrupt(digitalPinToInterrupt(GPIO_LIMIT_SWITCH_A), onRemoteReceiverInterrupt_limitSwitchA, RISING);
     attachInterrupt(digitalPinToInterrupt(GPIO_LIMIT_SWITCH_B), onRemoteReceiverInterrupt_limitSwitchB, RISING);
@@ -92,6 +94,21 @@ void initHardware() {
     lcd.print(String(FW_VERSION));
     Serial.println(String(FW_VERSION));
 }
+
+void updateValueDisplay() {
+    lcd.clear();
+
+    lcd.setCursor(0, 0);
+    lcd.print(editingA ? ">" : " ");
+    lcd.print("A: ");
+    lcd.print(stepperA.getPosition());
+
+    lcd.setCursor(0, 1);
+    lcd.print(editingA ? " " : ">");
+    lcd.print("B: ");
+    lcd.print(stepperB.getPosition());
+}
+
 
 void setup() {
     initHardware();
@@ -116,16 +133,34 @@ void loop() {
     inputManager.handleInput(interruptTriggeredGpio);
     stepperCoordinator.run();
 
+    // --- Encoder rotation ---
+    const int currentClk = digitalRead(GPIO_ENCODER_CLK);
+    if (currentClk != lastEncoderClk && currentClk == LOW && stepperCoordinator.isHomed()) {
+        const int dt = digitalRead(GPIO_ENCODER_DT);
+        const int dir = (dt != currentClk) ? 1 : -1;
+
+        if (editingA) {
+            stepperA.moveOffset(dir * 32);
+        } else {
+            stepperB.moveOffset(dir * 32);
+        }
+        updateValueDisplay();
+    }
+    lastEncoderClk = currentClk;
+
+    // --- Encoder button press ---
+    if (inputManager.encoderButton.takeActionIfPossible()) {
+        editingA = !editingA;
+        updateValueDisplay();
+    }
+
     // At most 2 fps, for now
     if (lastUpdate + 500 > millis()) {
         return;
     }
 
-    printLn("A %d, B %d", stepperA.getPosition(), stepperB.getPosition());
-
+    updateValueDisplay();
     lastUpdate = millis();
-
-    if (inputManager.encoderButton.takeActionIfPossible()) {
-        printLn("Encoder switch A triggered");
-    }
+    printLn("A %d M %d X %d, B %d M %d X %d", stepperA.getPosition(), stepperA.getMinPosition(),
+            stepperA.getMaxPosition(), stepperB.getPosition(), stepperB.getMinPosition(), stepperB.getMaxPosition());
 }

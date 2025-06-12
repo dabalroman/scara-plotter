@@ -23,27 +23,33 @@ class StepperMotorCoordinator {
         if (homingSequence == homingA) {
             if (inputManager.limitSwitchA.takeActionIfPossible()) {
                 stepperMotorA.triggerMinPositionLimitSwitch();
+                stepperMotorA.setZeroPosition();
                 stepperMotorA.setMinPosition(stepperMotorA.getPosition());
-                stepperMotorA.setMaxPosition(stepperMotorA.getPosition() + stepperRange);
+                stepperMotorA.setMaxPosition(0);
 
                 homingSequence = homingB;
+
+                // Reset limit switch state if it was clicked at the very start
+                inputManager.limitSwitchB.takeActionIfPossible();
+
                 printLn("Hit A limit on %d", stepperMotorA.getPosition());
             }
 
-            stepperMotorA.moveOffset(-4);
-            stepperMotorB.moveOffset(-4);
+            stepperMotorA.moveOffset(-32);
+            // stepperMotorB.moveOffset(-32);
         } else if (homingSequence == homingB) {
             if (inputManager.limitSwitchB.takeActionIfPossible()) {
                 stepperMotorB.triggerMaxPositionLimitSwitch();
-                stepperMotorB.setMinPosition(stepperMotorB.getPosition() - stepperRange);
+                stepperMotorB.setZeroPosition();
+                stepperMotorB.setMinPosition(0);
                 stepperMotorB.setMaxPosition(stepperMotorB.getPosition());
 
                 homingSequence = finished;
                 printLn("Hit B limit on %d", stepperMotorB.getPosition());
             }
 
-            stepperMotorA.moveOffset(4);
-            stepperMotorB.moveOffset(4);
+            stepperMotorA.moveOffset(32);
+            stepperMotorB.moveOffset(32);
         }
     }
 
@@ -60,7 +66,11 @@ class StepperMotorCoordinator {
 public:
     StepperMotorCoordinator(StepperMotor &_stepperMotorA, StepperMotor &_stepperMotorB, InputManager &_inputManager)
         : stepperMotorA(_stepperMotorA), stepperMotorB(_stepperMotorB), inputManager(_inputManager) {
-    };
+    }
+
+    bool isHomed () const {
+        return homingSequence == finished;
+    }
 
     void home() {
         homingSequence = homingA;
