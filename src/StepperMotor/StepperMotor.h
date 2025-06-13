@@ -1,7 +1,6 @@
 #ifndef STEPPERMOTOR_H
 #define STEPPERMOTOR_H
 #include "AccelStepper.h"
-#include "RemoteDevelopmentService/LoggerHelper.h"
 
 
 class StepperMotor {
@@ -12,8 +11,8 @@ class StepperMotor {
 
 public:
     explicit StepperMotor(AccelStepper &stepper) : stepper(stepper) {
-        stepper.setMaxSpeed(200); // Steps/sec
-        stepper.setAcceleration(50); // Steps/sec^2
+        stepper.setMaxSpeed(400); // Steps/sec
+        stepper.setAcceleration(200); // Steps/sec^2
     }
 
     static long clamp(const long min, const long value, const long max) {
@@ -60,14 +59,18 @@ public:
         return maxPosition;
     }
 
+    bool isRunning() const {
+        return stepper.isRunning();
+    }
+
     void moveToPosition(const long position) const {
-        const long clampedPosition = clamp(minPosition, position, maxPosition);
+        // const long clampedPosition = clamp(minPosition, position, maxPosition);
 
-        if (clampedPosition != position) {
-            printLn("Tried to move beyond limit - target %d, clamped %d", position, clampedPosition);
-        }
+        // if (clampedPosition != position) {
+            // printLn("Tried to move beyond limit - target %d, clamped %d", position, clampedPosition);
+        // }
 
-        stepper.moveTo(clampedPosition);
+        stepper.moveTo(position);
     }
 
     /** Dangerous, use only for homing */
@@ -77,6 +80,10 @@ public:
 
     long getPosition() const {
         return stepper.currentPosition();
+    }
+
+    long getTargetPosition() const {
+        return stepper.targetPosition();
     }
 
     long getDirection() const {

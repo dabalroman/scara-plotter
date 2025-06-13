@@ -1,5 +1,6 @@
 #ifndef STEPPERMOTORCOORDINATOR_H
 #define STEPPERMOTORCOORDINATOR_H
+#include "gcode.h"
 #include "StepperMotor.h"
 #include "Input/InputManager.h"
 
@@ -8,7 +9,8 @@ enum HomingSequence {
     offsettingA,
     homingB,
     offsettingB,
-    finished
+    finished,
+    drawingPath
 };
 
 class StepperMotorCoordinator {
@@ -23,6 +25,8 @@ class StepperMotorCoordinator {
     const long homingSequenceOffset = 200;
     const long armRange = 2900;
 
+    size_t drawIndex = 0; // add this as a private member
+
     HomingSequence homingSequence = finished;
 
     void runHoming() {
@@ -30,8 +34,8 @@ class StepperMotorCoordinator {
             if (inputManager.limitSwitchA.takeActionIfPossible()) {
                 stepperMotorA.triggerMinPositionLimitSwitch();
                 stepperMotorA.setZeroPosition();
-                stepperMotorA.setMinPosition(stepperMotorA.getPosition());
-                stepperMotorA.setMaxPosition(0);
+                stepperMotorA.setMinPosition(armRange / -2);
+                stepperMotorA.setMaxPosition(armRange / 2);
 
                 homingSequence = offsettingA;
 
@@ -55,8 +59,8 @@ class StepperMotorCoordinator {
             if (inputManager.limitSwitchB.takeActionIfPossible()) {
                 stepperMotorB.triggerMaxPositionLimitSwitch();
                 stepperMotorB.setZeroPosition();
-                stepperMotorB.setMinPosition(0);
-                stepperMotorB.setMaxPosition(stepperMotorB.getPosition());
+                stepperMotorA.setMinPosition(armRange / -2);
+                stepperMotorA.setMaxPosition(armRange / 2);
 
                 homingSequence = offsettingB;
                 printLn("Hit B limit on %d", stepperMotorB.getPosition());
@@ -73,11 +77,31 @@ class StepperMotorCoordinator {
                 // Stepper B position is negative due to CW rotation.
                 stepperMotorB.setZeroPosition(halfOfRange + stepperMotorB.getPosition());
 
-                homingSequence = finished;
-                printLn("Offset B done");
+                homingSequence = drawingPath; // ← start drawing
+                drawIndex = 0;
+                printLn("Offset B done; starting path draw");
             }
 
             stepperMotorB.moveOffset(homingStepLength * -1);
+        } else if (homingSequence == drawingPath) {
+            if (drawIndex < pathLength) {
+                // check “close enough” rather than fully stopped
+                int16_t curA = stepperMotorA.getPosition();
+                int16_t tgtA = stepperMotorA.getTargetPosition();
+                int16_t curB = stepperMotorB.getPosition();
+                int16_t tgtB = stepperMotorB.getTargetPosition();
+
+                if (abs(curA - tgtA) < 10 && abs(curB - tgtB) < 10) {
+                    int16_t a = pathSteps[drawIndex][1];
+                    int16_t b = pathSteps[drawIndex][0];
+                    stepperMotorA.moveToPosition(a);
+                    stepperMotorB.moveToPosition(b);
+                    ++drawIndex;
+                }
+            } else {
+                homingSequence = finished; // fully done
+                printLn("Path draw complete");
+            }
         }
     }
 

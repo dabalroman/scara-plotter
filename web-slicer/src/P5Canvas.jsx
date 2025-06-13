@@ -15,7 +15,7 @@ export default function P5Canvas() {
 
       const minDistance = 100
       const maxDistance = 360
-      const armLen = 200
+      const armLen = 160
       const fullSteps = 2900
       const fullDegrees = 200
 
@@ -107,8 +107,31 @@ export default function P5Canvas() {
           steps: {aSteps, bSteps}
         }
       }
+      
+      function sliceAndPrintPath() {
+        const entries = points.map(pt => {
+          const kin = computeRhombusKinematics(
+            pt.x, pt.y,
+            armLen, minDistance, maxDistance,
+            fullSteps, fullDegrees
+          );
+          // if out of range or invalid, mark steps as zero or handle accordingly
+          const a = kin.inRange && kin.validArmsPositions ? kin.steps.aSteps : 0;
+          const b = kin.inRange && kin.validArmsPositions ? kin.steps.bSteps : 0;
+          return `{ ${a}, ${b} }`;
+        });
+        
+        let gcodeArray = "";
 
-
+        gcodeArray += "// Auto-generated path steps (A, B):\n";
+        gcodeArray += "const int pathLength = " + entries.length + ";\n";
+        gcodeArray += "const int16_t pathSteps[pathLength][2] = {\n";
+        entries.forEach(line => gcodeArray += "  " + line + ",\n");
+        gcodeArray += "};\n";
+        
+        console.log(gcodeArray);
+      }
+      
       const drawMouse = () => {
         const {x, y} = screenToWorld(p.mouseX, p.mouseY)
         p.fill(0, 0, 255)
@@ -140,8 +163,10 @@ export default function P5Canvas() {
         const step = 2
         for (let i = 0; i < totalLength; i += step) {
           const pt = path.getPointAtLength(i)
-          points.push({x: pt.x, y: pt.y})
+          points.push({x: pt.x - 100, y: pt.y + 120})
         }
+
+        sliceAndPrintPath();
       }
 
       p.draw = () => {
