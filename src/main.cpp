@@ -137,7 +137,7 @@ void loop() {
     const int currentClk = digitalRead(GPIO_ENCODER_CLK);
     if (currentClk != lastEncoderClk && currentClk == LOW && stepperCoordinator.isHomed()) {
         const int dt = digitalRead(GPIO_ENCODER_DT);
-        const int dir = (dt != currentClk) ? 1 : -1;
+        const int dir = (dt != currentClk) ? -1 : 1;
 
         if (editingA) {
             stepperA.moveOffset(dir * 32);

@@ -5,7 +5,9 @@
 
 enum HomingSequence {
     homingA,
+    offsettingA,
     homingB,
+    offsettingB,
     finished
 };
 
@@ -17,9 +19,13 @@ class StepperMotorCoordinator {
     const long stepperRange = 1000;
     const long minimumStepperDistanceFromEachOther = 200;
 
+    const long homingStepLength = 32;
+    const long homingSequenceOffset = 200;
+    const long armRange = 2900;
+
     HomingSequence homingSequence = finished;
 
-    void runHoming () {
+    void runHoming() {
         if (homingSequence == homingA) {
             if (inputManager.limitSwitchA.takeActionIfPossible()) {
                 stepperMotorA.triggerMinPositionLimitSwitch();
@@ -27,7 +33,7 @@ class StepperMotorCoordinator {
                 stepperMotorA.setMinPosition(stepperMotorA.getPosition());
                 stepperMotorA.setMaxPosition(0);
 
-                homingSequence = homingB;
+                homingSequence = offsettingA;
 
                 // Reset limit switch state if it was clicked at the very start
                 inputManager.limitSwitchB.takeActionIfPossible();
@@ -35,8 +41,16 @@ class StepperMotorCoordinator {
                 printLn("Hit A limit on %d", stepperMotorA.getPosition());
             }
 
-            stepperMotorA.moveOffset(-32);
-            // stepperMotorB.moveOffset(-32);
+            stepperMotorA.moveOffset(homingStepLength * -1);
+            stepperMotorB.moveOffset(homingStepLength * -1);
+        } else if (homingSequence == offsettingA) {
+            if (stepperMotorA.getPosition() > homingSequenceOffset) {
+                homingSequence = homingB;
+                printLn("Offset A done");
+            }
+
+            stepperMotorA.moveOffset(homingStepLength);
+            stepperMotorB.moveOffset(homingStepLength);
         } else if (homingSequence == homingB) {
             if (inputManager.limitSwitchB.takeActionIfPossible()) {
                 stepperMotorB.triggerMaxPositionLimitSwitch();
@@ -44,12 +58,26 @@ class StepperMotorCoordinator {
                 stepperMotorB.setMinPosition(0);
                 stepperMotorB.setMaxPosition(stepperMotorB.getPosition());
 
-                homingSequence = finished;
+                homingSequence = offsettingB;
                 printLn("Hit B limit on %d", stepperMotorB.getPosition());
             }
 
-            stepperMotorA.moveOffset(32);
-            stepperMotorB.moveOffset(32);
+            stepperMotorB.moveOffset(homingStepLength);
+        } else if (homingSequence == offsettingB) {
+            if (stepperMotorB.getPosition() < homingSequenceOffset * -1) {
+                const long halfOfRange = armRange / 2;
+
+                // Set "0" in both to the robot middle.
+                // Stepper A position is positive, due to CCW rotation.
+                stepperMotorA.setZeroPosition(halfOfRange * -1 + stepperMotorA.getPosition());
+                // Stepper B position is negative due to CW rotation.
+                stepperMotorB.setZeroPosition(halfOfRange + stepperMotorB.getPosition());
+
+                homingSequence = finished;
+                printLn("Offset B done");
+            }
+
+            stepperMotorB.moveOffset(homingStepLength * -1);
         }
     }
 
@@ -68,7 +96,7 @@ public:
         : stepperMotorA(_stepperMotorA), stepperMotorB(_stepperMotorB), inputManager(_inputManager) {
     }
 
-    bool isHomed () const {
+    bool isHomed() const {
         return homingSequence == finished;
     }
 
@@ -76,8 +104,8 @@ public:
         homingSequence = homingA;
     }
 
-    void run () {
-        if (homingSequence == homingA || homingSequence == homingB) {
+    void run() {
+        if (homingSequence != finished) {
             runHoming();
         } else {
             runStandard();

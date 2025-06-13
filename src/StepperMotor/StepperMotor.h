@@ -37,8 +37,6 @@ public:
             stepper.moveTo(maxPosition);
         }
 
-        stepper.setCurrentPosition(minPosition);
-
         stepper.stop();
     }
 
@@ -50,8 +48,8 @@ public:
         maxPosition = _maxPosition;
     }
 
-    void setZeroPosition() const {
-        stepper.setCurrentPosition(0);
+    void setZeroPosition(long position = 0) const {
+        stepper.setCurrentPosition(position);
     }
 
     long getMinPosition() const {
