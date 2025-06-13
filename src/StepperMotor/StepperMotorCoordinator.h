@@ -16,6 +16,7 @@ enum HomingSequence {
 class StepperMotorCoordinator {
     StepperMotor &stepperMotorA;
     StepperMotor &stepperMotorB;
+    ServoPWM &penServo;
     InputManager &inputManager;
 
     const long stepperRange = 1000;
@@ -25,7 +26,9 @@ class StepperMotorCoordinator {
     const long homingSequenceOffset = 200;
     const long armRange = 2900;
 
-    size_t drawIndex = 0; // add this as a private member
+    size_t drawIndex = 0;
+    bool penReadyToMove = false;
+    bool inMotion = false;
 
     HomingSequence homingSequence = finished;
 
@@ -77,7 +80,7 @@ class StepperMotorCoordinator {
                 // Stepper B position is negative due to CW rotation.
                 stepperMotorB.setZeroPosition(halfOfRange + stepperMotorB.getPosition());
 
-                homingSequence = drawingPath; // ← start drawing
+                homingSequence = drawingPath;
                 drawIndex = 0;
                 printLn("Offset B done; starting path draw");
             }
@@ -85,22 +88,43 @@ class StepperMotorCoordinator {
             stepperMotorB.moveOffset(homingStepLength * -1);
         } else if (homingSequence == drawingPath) {
             if (drawIndex < pathLength) {
-                // check “close enough” rather than fully stopped
-                int16_t curA = stepperMotorA.getPosition();
-                int16_t tgtA = stepperMotorA.getTargetPosition();
-                int16_t curB = stepperMotorB.getPosition();
-                int16_t tgtB = stepperMotorB.getTargetPosition();
+                const long rawA = pathSteps[drawIndex][1];
+                const long rawB = pathSteps[drawIndex][0];
 
-                if (abs(curA - tgtA) < 10 && abs(curB - tgtB) < 10) {
-                    int16_t a = pathSteps[drawIndex][1];
-                    int16_t b = pathSteps[drawIndex][0];
-                    stepperMotorA.moveToPosition(a);
-                    stepperMotorB.moveToPosition(b);
+                if (rawA >= 4096 && rawB >= 4096) {
+                    penServo.up();
+                    penReadyToMove = false;
+                    drawIndex++;
+
+                    if (drawIndex < pathLength) {
+                        stepperMotorA.moveToPosition(pathSteps[drawIndex][1]);
+                        stepperMotorB.moveToPosition(pathSteps[drawIndex][0]);
+                    }
+                    return;
+                }
+
+                const long currentA = stepperMotorA.getPosition();
+                const long targetA = stepperMotorA.getTargetPosition();
+                const long currentB = stepperMotorB.getPosition();
+                const long targetB = stepperMotorB.getTargetPosition();
+                const bool atTarget = abs(currentA - targetA) < 5 && abs(currentB - targetB) < 5;
+
+                if (atTarget && !penReadyToMove) {
+                    penServo.down();
+                    penReadyToMove = true;
+                    return;
+                }
+
+                if (atTarget) {
+                    stepperMotorA.moveToPosition(rawA);
+                    stepperMotorB.moveToPosition(rawB);
                     ++drawIndex;
                 }
             } else {
-                homingSequence = finished; // fully done
-                printLn("Path draw complete");
+                homingSequence = finished;
+                stepperMotorB.moveToPosition(0);
+                stepperMotorA.moveToPosition(0);
+                penServo.up();
             }
         }
     }
@@ -116,8 +140,10 @@ class StepperMotorCoordinator {
     }
 
 public:
-    StepperMotorCoordinator(StepperMotor &_stepperMotorA, StepperMotor &_stepperMotorB, InputManager &_inputManager)
-        : stepperMotorA(_stepperMotorA), stepperMotorB(_stepperMotorB), inputManager(_inputManager) {
+    StepperMotorCoordinator(StepperMotor &_stepperMotorA, StepperMotor &_stepperMotorB, ServoPWM &penServo,
+                            InputManager &_inputManager)
+        : stepperMotorA(_stepperMotorA), stepperMotorB(_stepperMotorB), penServo(penServo),
+          inputManager(_inputManager) {
     }
 
     bool isHomed() const {

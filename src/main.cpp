@@ -2,6 +2,7 @@
 #include <LiquidCrystal.h>
 
 #include "AccelStepper.h"
+#include "ServoPWM.h"
 #include "Input/InputManager.h"
 #include "RemoteDevelopmentService/LoggerHelper.h"
 #include "RemoteDevelopmentService/RemoteDevelopmentService.h"
@@ -55,7 +56,9 @@ AccelStepper accelStepperA(AccelStepper::DRIVER, GPIO_MOTOR_A_STEP, GPIO_MOTOR_A
 AccelStepper accelStepperB(AccelStepper::DRIVER, GPIO_MOTOR_B_STEP, GPIO_MOTOR_B_DIR);
 StepperMotor stepperA(accelStepperA);
 StepperMotor stepperB(accelStepperB);
-StepperMotorCoordinator stepperCoordinator(stepperA, stepperB, inputManager);
+ServoPWM penServo(GPIO_SERVO);
+
+StepperMotorCoordinator stepperCoordinator(stepperA, stepperB, penServo, inputManager);
 
 unsigned long lastUpdate = 0;
 
@@ -80,7 +83,7 @@ void initHardware() {
     pinMode(GPIO_MOTOR_B_DIR, OUTPUT);
     pinMode(GPIO_MOTOR_B_STEP, OUTPUT);
 
-    pinMode(GPIO_SERVO, OUTPUT);
+    // pinMode(GPIO_SERVO, OUTPUT);
 
     pinMode(GPIO_LIMIT_SWITCH_A, INPUT);
     pinMode(GPIO_LIMIT_SWITCH_B, INPUT);
@@ -88,6 +91,8 @@ void initHardware() {
     attachInterrupt(digitalPinToInterrupt(GPIO_LIMIT_SWITCH_A), onRemoteReceiverInterrupt_limitSwitchA, RISING);
     attachInterrupt(digitalPinToInterrupt(GPIO_LIMIT_SWITCH_B), onRemoteReceiverInterrupt_limitSwitchB, RISING);
     attachInterrupt(digitalPinToInterrupt(GPIO_ENCODER_SW), onRemoteReceiverInterrupt_encoderSwitch, RISING);
+
+    penServo.begin();
 
     lcd.begin(16, 2);
     lcd.clear();
@@ -151,6 +156,7 @@ void loop() {
     // --- Encoder button press ---
     if (inputManager.encoderButton.takeActionIfPossible()) {
         editingA = !editingA;
+
         updateValueDisplay();
     }
 
@@ -161,6 +167,4 @@ void loop() {
 
     updateValueDisplay();
     lastUpdate = millis();
-    printLn("A %d M %d X %d, B %d M %d X %d", stepperA.getPosition(), stepperA.getMinPosition(),
-            stepperA.getMaxPosition(), stepperB.getPosition(), stepperB.getMinPosition(), stepperB.getMaxPosition());
 }

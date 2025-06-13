@@ -14,9 +14,9 @@ export default function P5Canvas() {
     const sketch = (p) => {
       let points = []
 
-      const minDistance = 100
-      const maxDistance = 360
-      const armLen = 160
+      const minDistance = 50
+      const maxDistance = 290
+      const armLen = 150
       const fullSteps = 2900
       const fullDegrees = 200
 
@@ -111,6 +111,8 @@ export default function P5Canvas() {
 
       function sliceAndPrintPath() {
         const entries = [];
+        entries.push('{ 32767, 32767 }');
+
         for (const pt of points) {
           if (!pt) {
             entries.push('{ 32767, 32767 }');
@@ -147,8 +149,10 @@ export default function P5Canvas() {
         p.createCanvas(640, 480)
         p.background(240)
 
-        const offsetX = -95;
-        const offsetY = 320;
+        const offsetX = -75;
+        const offsetY = 300;
+        const scaleX = 0.85;
+        const scaleY = 1;
 
         // Load & parse SVG path
         const raw = await fetch('/PP.svg').then(res => res.text())
@@ -159,7 +163,10 @@ export default function P5Canvas() {
           const step = 2;
           for (let i = 0; i < totalLength; i += step) {
             const pt = path.getPointAtLength(i);
-            points.push({ x: pt.x + offsetX, y: -pt.y + offsetY});
+            points.push({
+              x: pt.x * scaleX + offsetX,
+              y: -pt.y * scaleY + offsetY
+            });
           }
           points.push(null); // pen up
         }

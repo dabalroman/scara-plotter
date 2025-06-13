@@ -2,7 +2,7 @@
 #define INPUT_H
 
 #include <Arduino.h>
-constexpr uint8_t minimumTriggerDelayMs = 50;
+constexpr uint8_t minimumTriggerDelayMs = 200;
 
 class Input {
     uint8_t gpio;
