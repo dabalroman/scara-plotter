@@ -4,6 +4,7 @@ import p5 from 'p5'
 export default function P5Canvas() {
   const ref = useRef()
   const [sketchKey, setSketchKey] = useState(0)
+  const [gcode, setGcode] = useState('');
 
   useEffect(() => {
     while (ref.current.firstChild) {
@@ -107,63 +108,60 @@ export default function P5Canvas() {
           steps: {aSteps, bSteps}
         }
       }
-      
+
       function sliceAndPrintPath() {
-        const entries = points.map(pt => {
+        const entries = [];
+        for (const pt of points) {
+          if (!pt) {
+            entries.push('{ 32767, 32767 }');
+            continue;
+          }
+
           const kin = computeRhombusKinematics(
             pt.x, pt.y,
             armLen, minDistance, maxDistance,
             fullSteps, fullDegrees
           );
-          // if out of range or invalid, mark steps as zero or handle accordingly
+
           const a = kin.inRange && kin.validArmsPositions ? kin.steps.aSteps : 0;
           const b = kin.inRange && kin.validArmsPositions ? kin.steps.bSteps : 0;
-          return `{ ${a}, ${b} }`;
-        });
-        
-        let gcodeArray = "";
+          entries.push(`{ ${a}, ${b} }`);
+        }
 
-        gcodeArray += "// Auto-generated path steps (A, B):\n";
-        gcodeArray += "const int pathLength = " + entries.length + ";\n";
-        gcodeArray += "const int16_t pathSteps[pathLength][2] = {\n";
-        entries.forEach(line => gcodeArray += "  " + line + ",\n");
-        gcodeArray += "};\n";
-        
-        console.log(gcodeArray);
-      }
-      
-      const drawMouse = () => {
-        const {x, y} = screenToWorld(p.mouseX, p.mouseY)
-        p.fill(0, 0, 255)
-        p.noStroke()
-        p.circle(x, y, 6)
+        let builder = "";
 
-        p.pop()
+        builder += "#ifndef GCODE_H\n";
+        builder += "#define GCODE_H\n";
+        builder += "#include <Arduino.h>\n\n";
+        builder += "// Auto-generated path steps (A, B):\n";
+        builder += "const int pathLength = " + entries.length + ";\n";
+        builder += "const int16_t pathSteps[pathLength][2] = {\n";
+        entries.forEach(line => builder += "  " + line + ",\n");
+        builder += "};\n";
+        builder += "#endif //GCODE_H\n";
 
-        // print coords below canvas
-        p.push()
-        p.resetMatrix()
-        p.fill(0)
-        p.noStroke()
-        p.textSize(14)
-        p.text(`mouse → x: ${x.toFixed(1)}, y: ${y.toFixed(1)}`, 10, p.height - 10)
-        p.pop()
+        setGcode(builder)
       }
 
       p.setup = async () => {
         p.createCanvas(640, 480)
         p.background(240)
 
-        // Load & parse SVG path
-        const raw = await fetch('/star.svg').then(res => res.text())
-        const doc = new DOMParser().parseFromString(raw, 'image/svg+xml')
-        const path = doc.querySelector('path')
+        const offsetX = -95;
+        const offsetY = 320;
 
-        const totalLength = path.getTotalLength()
-        const step = 2
-        for (let i = 0; i < totalLength; i += step) {
-          const pt = path.getPointAtLength(i)
-          points.push({x: pt.x - 110, y: pt.y + 80})
+        // Load & parse SVG path
+        const raw = await fetch('/PP.svg').then(res => res.text())
+        const doc = new DOMParser().parseFromString(raw, 'image/svg+xml')
+        const paths = doc.querySelectorAll('path');
+        for (const path of paths) {
+          const totalLength = path.getTotalLength();
+          const step = 2;
+          for (let i = 0; i < totalLength; i += step) {
+            const pt = path.getPointAtLength(i);
+            points.push({ x: pt.x + offsetX, y: -pt.y + offsetY});
+          }
+          points.push(null); // pen up
         }
 
         sliceAndPrintPath();
@@ -183,17 +181,23 @@ export default function P5Canvas() {
         // SVG polyline
         p.noFill()
         p.stroke(0)
-        p.beginShape()
+        p.beginShape();
         for (const pt of points) {
-          p.vertex(pt.x, pt.y)
+          if (!pt) {
+            p.endShape();
+            p.beginShape();
+            continue;
+          }
+          p.vertex(pt.x, pt.y);
         }
-        p.endShape()
+        p.endShape();
 
         // SVG sample points
         p.fill(255, 0, 0)
         p.noStroke()
         for (const pt of points) {
-          p.circle(pt.x, pt.y, 2)
+          if (!pt) continue;
+          p.circle(pt.x, pt.y, 2);
         }
 
         // drawMouse();
@@ -256,6 +260,11 @@ export default function P5Canvas() {
   return (
     <>
       <button onClick={() => setSketchKey(k => k + 1)}>Reload Sketch</button>
+      <button onClick={() => {
+        navigator.clipboard.writeText(gcode).then(() => {
+          console.log('G-code copied to clipboard!');
+        });
+      }}>Copy G-code to Clipboard</button>
       <div ref={ref}/>
     </>
   )
