@@ -155,7 +155,7 @@ export default function P5Canvas() {
         p.background(240)
 
         // Load & parse SVG path
-        const raw = await fetch('/sample.svg').then(res => res.text())
+        const raw = await fetch('/star.svg').then(res => res.text())
         const doc = new DOMParser().parseFromString(raw, 'image/svg+xml')
         const path = doc.querySelector('path')
 
@@ -163,7 +163,7 @@ export default function P5Canvas() {
         const step = 2
         for (let i = 0; i < totalLength; i += step) {
           const pt = path.getPointAtLength(i)
-          points.push({x: pt.x - 100, y: pt.y + 120})
+          points.push({x: pt.x - 110, y: pt.y + 80})
         }
 
         sliceAndPrintPath();
